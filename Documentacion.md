@@ -8,11 +8,11 @@
 
 # **Modelo Conceptual**
 
-![modelo conceptual.png](Proyecto%20#1%20Sistemas%20de%20Bases%20de%20Datos%201%20-%20Juan%20Jo%201ad61535553780d49794ff84f5ed3516/modelo_conceptual.png)
+![modelo conceptual.png](Imgdocumentacion/modelo_conceptual.png)
 
 # **Modelo Lógico**
 
-![Modelo logico.png](Proyecto%20#1%20Sistemas%20de%20Bases%20de%20Datos%201%20-%20Juan%20Jo%201ad61535553780d49794ff84f5ed3516/Modelo_logico.png)
+![Modelo logico.png](Imgdocumentacion/Modelo_logico.png)
 
 ## Detalles del modelo
 
@@ -34,7 +34,7 @@ El inventario puede tener categorias para almacenar productos, y los productos t
 
 # **Modelo Físico**
 
-![modelo fisico.png](Proyecto%20#1%20Sistemas%20de%20Bases%20de%20Datos%201%20-%20Juan%20Jo%201ad61535553780d49794ff84f5ed3516/modelo_fisico.png)
+![modelo fisico.png](Imgdocumentacion/modelo_fisico.png)
 
 # **Normalización tablas**
 
