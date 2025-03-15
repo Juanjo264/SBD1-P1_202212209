@@ -6,7 +6,7 @@ from flask_sqlalchemy import SQLAlchemy
 import oracledb
 import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
-# Inicializar Flask source .venv/bin/activate
+# Inicializar Flask source .venv/bin/activate or desactivate
 
 app = Flask(__name__)
 CORS(app)
