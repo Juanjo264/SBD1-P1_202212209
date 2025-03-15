@@ -16,6 +16,26 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'oracle+oracledb://SYSTEM:99437@localhos
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
+class Envios(db.Model):
+    __tablename__ = 'envios'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    fecha = db.Column(db.DateTime, nullable=False)
+    numero_orden = db.Column(db.Integer, nullable=False)
+    direccion = db.Column(db.Integer, nullable=False)
+    transporte = db.Column(db.String(20), nullable=False)
+    creado = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    actualizado = db.Column(db.DateTime, onupdate=datetime.datetime.utcnow)
+
+class OrdenCompra(db.Model):
+    __tablename__ = 'ordenes_de_compra'
+    __table_args__ = {'extend_existing': True}  
+
+    id = db.Column(db.Integer, primary_key=True)
+    cliente_id = db.Column(db.Integer, db.ForeignKey('clientes.id'), nullable=True)
+    envios_id = db.Column(db.Integer, db.ForeignKey('envios.id'), nullable=False)
+    creado = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    actualizado = db.Column(db.DateTime, onupdate=datetime.datetime.utcnow)
 
 class TipoPago(db.Model):
     __tablename__ = 'tipos_pago'
@@ -97,16 +117,20 @@ class NombreProducto(db.Model):
     nombre = db.Column(db.String(50), nullable=False)
     productos_id = db.Column(db.Integer, db.ForeignKey('productos.id'), nullable=False)
 
-
-
-class OrdenCompra(db.Model):
-    __tablename__ = 'ordenes_de_compra'
+class Pago(db.Model):
+    __tablename__ = 'pagos'
+    
     id = db.Column(db.Integer, primary_key=True)
     cliente_id = db.Column(db.Integer, db.ForeignKey('clientes.id'), nullable=False)
-    creado = db.Column(db.Date, default=datetime.datetime.utcnow)
-    actualizado = db.Column(db.Date)
+    metodo_pago_id = db.Column(db.Integer, db.ForeignKey('tipos_pago.id'), nullable=False)
+    creado_en = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    actualizado_en = db.Column(db.DateTime, onupdate=datetime.datetime.utcnow)
 
-# Crear la base de datos 
+    cliente = db.relationship('Cliente', backref=db.backref('pagos', lazy=True))
+    metodo_pago = db.relationship('TipoPago', backref=db.backref('pagos', lazy=True))
+
+
+ 
 with app.app_context():
     db.create_all()
 
@@ -316,33 +340,114 @@ def delete_producto(id):
 @app.route('/api/ordenes', methods=['POST'])
 def create_orden():
     data = request.get_json()
-    if not data or 'cliente_id' not in data:
+
+    if not data.get("id") or not data.get("envios_id"):
         return jsonify({'message': 'Datos incompletos'}), 400
-    
-    new_orden = OrdenCompra(cliente_id=data['cliente_id'])
-    db.session.add(new_orden)
+
+    nueva_orden = OrdenCompra(
+        id=data['id'],
+        cliente_id=data.get('cliente_id'),  
+        envios_id=data['envios_id']
+    )
+
+    db.session.add(nueva_orden)
     db.session.commit()
+
     return jsonify({'status': 'success', 'message': 'Orden de compra creada correctamente'}), 201
 
 @app.route('/api/ordenes/<int:id>', methods=['GET'])
 def get_orden(id):
     orden = OrdenCompra.query.get(id)
+
     if not orden:
-        return jsonify({'message': 'Orden no encontrada'}), 404
+        return jsonify({'status': 'error', 'message': 'Orden no encontrada'}), 404
+
+    return jsonify({
+        'id': orden.id,
+        'cliente_id': orden.cliente_id,
+        'envios_id': orden.envios_id,
+        'creado': orden.creado,
+        'actualizado': orden.actualizado
+    }), 200
+
+@app.route('/api/ordenes', methods=['GET'])
+def get_ordenes():
+    ordenes = OrdenCompra.query.all()
     
-    return jsonify({'id': orden.id, 'cliente_id': orden.cliente_id, 'creado': orden.creado})
+    return jsonify({
+        'ordenes': [
+            {
+                'id': orden.id,
+                'cliente_id': orden.cliente_id,
+                'envios_id': orden.envios_id,
+                'creado': orden.creado,
+                'actualizado': orden.actualizado
+            } for orden in ordenes
+        ]
+    }), 200
+
+@app.route('/api/ordenes/<int:id>', methods=['PUT'])
+def update_orden(id):
+    orden = OrdenCompra.query.get(id)
+
+    if not orden:
+        return jsonify({'status': 'error', 'message': 'Orden no encontrada'}), 404
+
+    data = request.get_json()
+
+    if 'cliente_id' in data:
+        orden.cliente_id = data['cliente_id']
+    if 'envios_id' in data:
+        orden.envios_id = data['envios_id']
+
+    db.session.commit()
+
+    return jsonify({'status': 'success', 'message': 'Orden de compra actualizada correctamente'}), 200
 
 # *****************Endpoints de pago************
-@app.route('/api/formas_pago', methods=['POST'])
-def create_forma_pago():
+@app.route('/api/pagos', methods=['POST'])
+def create_pago():
     data = request.get_json()
-    if not data or 'clientes_id' not in data or 'tipo_metodo_pago' not in data:
+
+    required_fields = ['id', 'cliente_id', 'metodo_pago_id']
+    if not all(field in data for field in required_fields):
         return jsonify({'message': 'Datos incompletos'}), 400
-    
-    new_forma_pago = FormaPago(clientes_id=data['clientes_id'], tipo_metodo_pago=data['tipo_metodo_pago'])
-    db.session.add(new_forma_pago)
+
+    # Verificar  cliente existe
+    cliente = Cliente.query.get(data['cliente_id'])
+    if not cliente:
+        return jsonify({'message': 'Cliente no encontrado'}), 404
+
+    metodo_pago = TipoPago.query.get(data['metodo_pago_id'])
+    if not metodo_pago:
+        return jsonify({'message': 'Método de pago no válido'}), 404
+
+    new_pago = Pago(
+        id=data['id'],
+        cliente_id=data['cliente_id'],
+        metodo_pago_id=data['metodo_pago_id']
+    )
+
+    db.session.add(new_pago)
     db.session.commit()
-    return jsonify({'status': 'success', 'message': 'Forma de pago registrada correctamente'}), 201
+
+    return jsonify({'status': 'success', 'message': 'Pago registrado correctamente'}), 201
+
+@app.route('/api/pagos', methods=['GET'])
+def get_pagos():
+    pagos = Pago.query.all()
+    result = [
+        {
+            'id': pago.id,
+            'cliente_id': pago.cliente_id,
+            'metodo_pago_id': pago.metodo_pago_id,
+            'creado_en': pago.creado_en.strftime('%Y-%m-%d %H:%M:%S'),
+            'actualizado_en': pago.actualizado_en.strftime('%Y-%m-%d %H:%M:%S') if pago.actualizado_en else None
+        }
+        for pago in pagos
+    ]
+    return jsonify(result)
+
 
 # Ejecutar la aplicación
 if __name__ == '__main__':
